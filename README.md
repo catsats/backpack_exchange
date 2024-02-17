@@ -2,10 +2,14 @@
 
  要用脚本请把本文档看完
  
- 运行命令：node ./index.js
+ 运行命令：
+ 先运行 npm install
+ 后运行 node ./index.js
 
  先用我的邀请码注册backpack交易所：https://backpack.exchange/signup?referral=9ed76787-d966-4122-9a58-cd93d3a44de3
  不会的用脚本的可以推特私信问我 https://twitter.com/zisan_xyz
+
+ 没node的安装一下 这是教程：https://www.runoob.com/nodejs/nodejs-install-setup.html
 
  backpack 刷交易量 JavaScript 只刷sol/usdc
  注意事项：他们官网的api太多人用比较卡，可能在交易的时候会卡住，需要自己手动停止程序，重新运行
