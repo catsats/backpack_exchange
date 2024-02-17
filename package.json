@@ -1,0 +1,31 @@
+{
+  "name": "@cks-systems/backpack-client",
+  "version": "3.0.4",
+  "description": "Backpack exchange typescript client",
+  "main": "lib/backpack_client.js",
+  "license": "MIT",
+  "types": "lib/backpack_client.d.ts",
+  "homepage": "https://github.com/CKS-Systems/backpack-client",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CKS-Systems/backpack-client"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prebuild": "yarn clean",
+    "clean": "rimraf lib"
+  },
+  "dependencies": {
+    "got": "^11.8.2",
+    "qs": "^6.11.2",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/qs": "^6.9.7",
+    "@types/ws": "^8.5.10",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.3"
+  }
+}

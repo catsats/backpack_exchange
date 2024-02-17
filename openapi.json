@@ -1,0 +1,3033 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Backpack Exchange API",
+    "description": "\n# Introduction\n\nWelcome to the Backpack Exchange API. This API is for programmatic trade execution. All of the endpoints require requests to be signed with an ED25519 keypair for authentication.\n\nThe API is hosted at `https://api.backpack.exchange/` and the WS API is hosted at `wss://ws.backpack.exchange/`.\n\n# Authentication\n\n\n## Signing requests\n\nSigned requests are required for any API calls that mutate state. Additionally, some read only requests can be performed by signing or via session authentication.\n\nSigned requests require the following additional headers:\n\n- `X-Timestamp` - Unix time in ms that the request was sent.\n- `X-Window` - Time window in milliseconds that the request is valid for.\n- `X-API-Key` - Base64 encoded verifying key of the ED25519 keypair.\n- `X-Signature` - Base64 encoded signature of the request body.\n\nTo generate a signature perform the following:\n\n1) The key/values of the request body or query parameters should be ordered alphabetically and then turned into query string format.\n\n2) Append the header values for the timestamp and receive window to the above generated string in the format `&timestamp=<timestamp>&window=<window>`. If no `X-Window` header is passed the default value of 5000 still needs to be added to the signing string.\n\nEach request also has an instruction type, valid instructions are:\n\n```\nbalanceQuery\ndepositAddressQuery\ndepositQueryAll\nfillHistoryQueryAll\norderCancel\norderCancelAll\norderExecute\norderHistoryQueryAll\norderQuery\norderQueryAll\nwithdraw\nwithdrawalQueryAll\n```\n\nThe correct instruction type should be prefixed to the signing string. The instruction types for each request are documented alongside the request.\n\nFor example, an API request to cancel an order with the following body:\n\n```json\n{\n    \"orderId\": 28\n    \"symbol\": \"BTC_USDT\",\n}\n```\n\nWould require the following to be signed:\n\n```text\ninstruction=orderExecute&orderId=28&symbol=BTC_USDT&timestamp=1614550000000&window=5000\n```\n\nIf the API endpoint requires query parameters instead of a request body, the same procedure should be used on the query parameters. If the API endpoint does not have a request body or query parameters, only the timestamp and receive window need to be signed.\n\nThis message should be signed using the private key of the ED25519 keypair that corresponds to the public key in the `X-API-Key` header. The signature should then be base64 encoded and submitted in the `X-Signature` header.\n\n\n<br><br>\n***\n    ",
+    "version": "1.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.backpack.exchange"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Capital",
+      "description": "Capital management."
+    },
+    {
+      "name": "History",
+      "description": "Historical account data."
+    },
+    {
+      "name": "Markets",
+      "description": "Public market data."
+    },
+    {
+      "name": "Order",
+      "description": "Order management."
+    },
+    {
+      "name": "System",
+      "description": "Exchange system status."
+    },
+    {
+      "name": "Trades",
+      "description": "Public trade data."
+    },
+    {
+      "name": "Websocket Streams",
+      "description": "# Subscribing\n\nTo use the websocket API, connect to\n`wss://ws.backpack.exchange/stream`.\n\nTo subscribe to a stream with the name `stream` send a text frame\nover the websocket connection with the following JSON payload:\n\n```\n{\n  \"method\": \"SUBSCRIBE\",\n  \"params\": [\"stream\"]\n}\n```\n\nSimilarly, to unsubscribe from a stream with the name `stream`:\n\n```\n{\n  \"method\": \"UNSUBSCRIBE\",\n  \"params\": [\"stream\"]\n}\n```\n\nAll data from streams is wrapped in a JSON object of the following form:\n\n```\n{\n  \"stream\": <stream>\n  \"data\": <payload>\n}\n```\n\nThe following command can be used to test subscribing to a stream:\n```\n(sleep 1; \\\necho '{\"method\":\"SUBSCRIBE\",\"params\":[\"SOL_USDC@depth\"]}';\\\ncat) |\\\nwscat -c wss://ws.backpack.exchange/stream\n```\n\nTo keep the connection alive, a `Ping` frame will be sent from the\nserver every 60s, and a `Pong` is expected to be received from the\nclient. If a `Pong` is not received within 120s, a `Close` frame will be\nsent and the connection will be closed.\n\nIf the server is shutting down, a `Close` frame will be sent and then a\ngrace period of 30s will be given before the connection is closed. The\nclient should reconnect after receiving the `Close` frame. The client\nwill be reconnected to a server that is not shutting down.\n\nThe payloads for each stream time are outlined below.\n\n# Private\n\nSubscribing to a private stream requires a valid signature generated\nfrom an ED25519 keypair. For stream subscriptions, the signature\nshould be of the form:\n\n```text\ninstruction=accountQuery&timestamp=1614550000000&window=5000\n```\n\nPrivate streams are prefixed with `account.` and require signature data\nto be submitted in the subscribe parameters. The verifying key and\nsignature should be base64 encoded.\n\n```json\n{\n  \"method\": \"SUBSCRIBE\",\n  \"params\": [\"stream\", <verifying key>, <signature>, <timestamp>, <window>]\n}\n````\n\n## Order update stream\n\nOn any mutation to an order the order will be pushed to the order update\nstream. The event type of the order update will be one of the\nfollowing:\n\n- `orderAccepted`\n- `orderCancelled`\n- `orderExpired`\n- `orderFill`\n\nStream name format: `account.orderUpdate`\n\n```\n{\n  \"e\": \"orderAccepted\",   // Event type\n  \"E\": 1694687692980,     // Event time in ms\n  \"s\": \"SOL_USD\",         // Symbol\n  \"c\": \"123\",             // Client order ID\n  \"S\": \"Bid\",             // Side\n  \"o\": \"LIMIT\",           // Order type\n  \"f\": \"GTC\",           // Time in force\n  \"q\": \"32123\",           // Quantity\n  \"Q\": \"32123\",           // Quantity in quote\n  \"p\": \"20\",              // Price\n  \"P\": \"21\",              // Trigger price\n  \"X\": \"Filled\",          // Order state\n  \"i\": \"1111343026172067\" // Order id\n  \"l\": \"1.23\",            // Fill quantity\n  \"z\": \"321\",             // Executed quantity\n  \"Z\": \"123\",             // Executed quantity in quote\n  \"L\": \"20\",              // Fill price\n  \"m\": true,              // Whether the order was maker\n  \"n\": \"23\",              // Fee\n  \"N\": \"1.23\",            // Fee symbol\n  \"V\": \"RejectTaker\",     // Self trade prevention\n}\n```\n\nSome fields are conditional on the order settings or event type:\n\n- `c` - Only present if the order has a client order ID.\n- `q` - Only present if the order has a quantity set.\n- `Q` - Only present if the order is reverse market order.\n- `p` - Only present if the order is a limit order.\n- `P` - Only present if the order is a trigger order.\n- `l` - Only present if the event is a `orderFill` event.\n- `L` - Only present if the event is a `orderFill` event.\n- `m` - Only present if the event is a `orderFill` event.\n- `n` - Only present if the event is a `orderFill` event.\n- `N` - Only present if the event is a `orderFill` event.\n\n# Public\n\n## K-Line stream\n\nStream name format: `<symbol>@kline_<interval>`\n```\n{\n  \"e\": \"kline\",               // Event type\n  \"E\": 1694687692980,         // Event time in ms\n  \"s\": \"SOL_USD\",             // Symbol\n  \"k\": {\n    \"t\": 123400000, // K-Line start time\n    \"T\": 123460000, // K-Line close time\n    \"o\": \"18.75\",   // Open price\n    \"c\": \"19.25\",   // Close price\n    \"h\": \"19.80\",   // High price\n    \"l\": \"18.50\",   // Low price\n    \"v\": \"32123\",   // Base asset volume\n    \"n\": 93828,     // Number of trades\n    \"x\": false,     // Is this k-line closed?\n}\n```\n\n## Ticker stream\n\nThe ticker stream pushes 24hr rolling statistics for a single symbol.\n\nStream name format: `<symbol>@ticker`\n\n```\n{\n  \"e\": \"ticker\",      // Event type\n  \"E\": 1694687692980, // Event time in ms\n  \"s\": \"SOL_USD\",     // Symbol\n  \"o\": \"18.75\",       // First price\n  \"c\": \"19.24\",       // Last price\n  \"h\": \"19.80\",       // High price\n  \"l\": \"18.50\",       // Low price\n  \"v\": \"32123\",       // Base asset volume\n  \"n\": 93828,         // Number of trades\n}\n```\n\n## Trade stream\n\nStream name format: `<symbol>@trade`\n```\n{\n  \"e\": \"trade\",               // Event type\n  \"E\": 1694688638091,         // Event time in ms\n  \"s\": \"SOL_USDC\",            // Symbol\n  \"p\": \"18.68\",               // Price\n  \"q\": \"0.122\",               // Quantity\n  \"b\": \"111063114377265150\",  // Buyer order ID\n  \"a\": \"111063114585735170\",  // Seller order ID\n  \"T\": 1694688638089,         // Trade time in ms\n  \"m\": true                   // Is the buyer the maker?\n}\n```\n\n## Depth stream\n\nStream name format: `<symbol>@depth`\n```\n{\n  \"e\": \"depthUpdate\",     // Event type\n  \"E\": 1694687965941,     // Event time in ms\n  \"s\": \"SOL_USDC\",        // Symbol\n  \"a\": [                  // Asks\n    [\n      \"18.70\",\n      \"0.000\"\n    ]\n  ],\n  \"b\": [                  // Bids\n    [\n      \"18.67\",\n      \"0.832\"\n    ],\n    [\n      \"18.68\",\n      \"0.000\"\n    ]\n  ],\n  \"U\": \"111063070477058050\", // First update ID in event\n  \"u\": \"111063070525358080\"  // Final update ID in event\n}\n```\n\n## Book Ticker stream\n\nStream name format: `<symbol>@bookTicker`\n```\n{\n  \"e\": \"bookTicker\",        // Event type\n  \"E\": 1694687965941,       // Event time in ms\n  \"s\": \"SOL_USDC\",          // Symbol\n  \"a\": \"18.70\",             // Inside ask price\n  \"A\": \"1.000\",             // Inside ask quantity\n  \"b\": \"18.67\",             // Inside bid price\n  \"B\": \"2.000\",             // Inside bid quantity\n  \"u\": \"111063070525358080\" // Update ID of event\n}\n```"
+    }
+  ],
+  "paths": {
+    "/api/v1/capital": {
+      "get": {
+        "tags": [
+          "Capital"
+        ],
+        "summary": "Get balances.",
+        "description": "Retrieves account balances and the state of the balances (locked or\navailable).\n\nLocked assets are those that are currently in an open order.\n\n**Instruction:** `balanceQuery`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Filter for a subaccount (unsigned requests).",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/Balance"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_balances"
+      }
+    },
+    "/wapi/v1/capital/deposits": {
+      "get": {
+        "tags": [
+          "Capital"
+        ],
+        "summary": "Get deposits.",
+        "description": "Retrieves deposit history.\n\n**Instruction:** `depositQueryAll`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Filter for a subaccount (unsigned requests).",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Maximum number to return. Default 100, maximum 1000.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Offset. Default 0.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Deposit"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_deposits"
+      }
+    },
+    "/wapi/v1/capital/deposit/address": {
+      "get": {
+        "tags": [
+          "Capital"
+        ],
+        "summary": "Get deposit address.",
+        "description": "Retrieves the user specific deposit address if the user were to deposit\non the specified blockchain.\n\n**Instruction:** `depositAddressQuery`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "blockchain",
+            "schema": {
+              "$ref": "#/components/schemas/Blockchain"
+            },
+            "in": "query",
+            "description": "Blockchain symbol to get a deposit address for.",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Subaccount to get a deposit address for (unsigned requests).",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositAddress"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_deposit_address"
+      }
+    },
+    "/wapi/v1/history/orders": {
+      "get": {
+        "tags": [
+          "History"
+        ],
+        "summary": "Get order history.",
+        "description": "Retrieves the order history for the user. This includes orders that have\nbeen filled and are no longer on the book. It may include orders\nthat are on the book, but the `/orders` endpoint contains more up to\ndate data.\n\n**Instruction:** `orderHistoryQueryAll`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Filter for a subaccount (unsigned requests).",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "Filter to the given symbol.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Maximum number to return. Default `100`, maximum `1000`.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Offset. Default 0.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderRow"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_order_history"
+      }
+    },
+    "/wapi/v1/history/fills": {
+      "get": {
+        "tags": [
+          "History"
+        ],
+        "summary": "Get fill history.",
+        "description": "Retrieves historical fills, with optional filtering for a specific order\nor symbol.\n\n**Instruction:** `fillHistoryQueryAll`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Filter for a subaccount (unsigned requests).",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "orderId",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "Filter to the given order.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "Filter to the given symbol.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Maximum number to return. Default `100`, maximum `1000`.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Offset. Default 0.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderFillRow"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_fills"
+      }
+    },
+    "/api/v1/assets": {
+      "get": {
+        "tags": [
+          "Markets"
+        ],
+        "summary": "Get assets.",
+        "description": "Retrieves all the assets that are supported by the exchange.",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Asset"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_assets"
+      }
+    },
+    "/api/v1/markets": {
+      "get": {
+        "tags": [
+          "Markets"
+        ],
+        "summary": "Get markets.",
+        "description": "Retrieves all the markets that are supported by the exchange.",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Market"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_markets"
+      }
+    },
+    "/api/v1/ticker": {
+      "get": {
+        "tags": [
+          "Markets"
+        ],
+        "summary": "Get ticker.",
+        "description": "Retrieves summarised statistics for the last 24 hours.",
+        "parameters": [
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticker"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No ticker data found."
+          }
+        },
+        "operationId": "get_ticker"
+      }
+    },
+    "/api/v1/depth": {
+      "get": {
+        "tags": [
+          "Markets"
+        ],
+        "summary": "Get order book depth.",
+        "description": "Retrieves the order book depth for a given market symbol.",
+        "parameters": [
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/Depth"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_depth"
+      }
+    },
+    "/api/v1/klines": {
+      "get": {
+        "tags": [
+          "Markets"
+        ],
+        "summary": "Get K-lines.",
+        "description": "Get K-Lines for the given market symbol, optionally providing a\n`startTime` and `endTime`. If no `startTime` is provided, the interval\nduration will be used. If no `endTime` is provided, the current time\nwill be used.",
+        "parameters": [
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "interval",
+            "schema": {
+              "$ref": "#/components/schemas/KlineInterval"
+            },
+            "in": "query",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "startTime",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "UTC timestamp in seconds.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "endTime",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "UTC timestamp in seconds.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Kline"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_klines"
+      }
+    },
+    "/api/v1/order": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Get open order.",
+        "description": "Retrieves an open order from the order book. This only returns the order\nif it is resting on the order book (i.e. has not been completely filled,\nexpired, or cancelled).\n\nOne of `orderId` or `clientId` must be specified. If both are specified,\nthen `orderId` takes precedence.\n\n**Instruction:** `orderQuery`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "clientId",
+            "schema": {
+              "type": "integer",
+              "format": "uint32"
+            },
+            "in": "query",
+            "description": "Client ID of the order.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "orderId",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "ID of the order.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "Market symbol for the order.",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Subaccount the order belongs to, if request is not signed.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderType"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found."
+          }
+        },
+        "operationId": "get_order"
+      },
+      "post": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Execute order.",
+        "description": "Submits an order to the matching engine for execution.\n\n**Instruction:** `orderExecute`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderExecutePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Order executed.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderType"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Request accepted but not yet executed.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "System under maintenance."
+          }
+        },
+        "operationId": "execute_order"
+      },
+      "delete": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Cancel open order.",
+        "description": "Cancels an open order from the order book.\n\nOne of `orderId` or `clientId` must be specified. If both are specified,\nthen `orderId` takes precedence.\n\n**Instruction:** `orderCancel`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCancelPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Order cancelled.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderType"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Request accepted but not yet executed."
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "System under maintenance."
+          }
+        },
+        "operationId": "cancel_order"
+      }
+    },
+    "/api/v1/orders": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Get open orders.",
+        "description": "Retrieves all open orders. If a symbol is provided, only open orders for\nthat market will be returned, otherwise all open orders are\nreturned.\n\n**Instruction:** `orderQueryAll`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "The symbol of the market for the orders.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Subaccount the order belongs to, if request is not signed.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderType"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_open_orders"
+      },
+      "delete": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Cancel open orders.",
+        "description": "Cancels all open orders on the specified market.\n\n**Instruction:** `orderCancelAll`",
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCancelAllPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderType"
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Request accepted but not yet executed."
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "System under maintenance."
+          }
+        },
+        "operationId": "cancel_open_orders"
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Status.",
+        "description": "Get the system status, and the status message, if any.",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusAndMessage"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_status"
+      }
+    },
+    "/api/v1/ping": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Ping.",
+        "description": "Responds with `pong`.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "ping"
+      }
+    },
+    "/api/v1/time": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get system time.",
+        "description": "Retrieves the current system time.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_time"
+      }
+    },
+    "/api/v1/trades": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Get recent trades.",
+        "description": "Retrieve the most recent trades for a symbol. This is public data and\nis not specific to any account.\n\nThe maximum available recent trades is 1000. If you need more than 1000\ntrades, you will need to use the historical trades endpoint.",
+        "parameters": [
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "Market symbol to query fills for.",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "format": "uint16"
+            },
+            "in": "query",
+            "description": "Limit the number of fills returned. Default `100`, maximum `1000`.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trade"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_recent_trades"
+      }
+    },
+    "/api/v1/trades/history": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Get historical trades.",
+        "description": "Retrieves all historical trades for the given symbol. This is public\ntrade data and is not specific to any account.",
+        "parameters": [
+          {
+            "name": "symbol",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Limit the number of trades returned. Default `100`, maximum `1000`.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Offset. Default 0.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trade"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_historical_trades"
+      }
+    },
+    "/wapi/v1/capital/withdrawals": {
+      "get": {
+        "tags": [
+          "Capital"
+        ],
+        "summary": "Get withdrawals.",
+        "description": "Retrieves withdrawal history.\n\n**Instruction:** `withdrawalQueryAll`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "subaccountId",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "in": "query",
+            "description": "Filter for a subaccount (unsigned requests).",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Maximum number to return. Default `100`, maximum `1000`.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "description": "Offset. Default 0.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Withdrawal"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_withdrawals"
+      },
+      "post": {
+        "tags": [
+          "Capital"
+        ],
+        "summary": "Request withdrawal.",
+        "description": "Requests a withdrawal from the exchange.\n\nThe `twoFactorToken` field is required if the withdrawal address is not\nan address that is configured in the address book to not require\n2FA. These addresses can be configured [here](https://backpack.exchange/settings/withdrawal-addresses?twoFactorWithdrawalAddress=true).\n\n**Instruction:** `withdraw`",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "API key",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-TIMESTAMP",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "header",
+            "description": "Timestamp of the request in milliseconds",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-WINDOW",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "header",
+            "description": "Time the request is valid for in milliseconds (default `5000`)",
+            "required": false,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "X-SIGNATURE",
+            "schema": {
+              "type": "string"
+            },
+            "in": "header",
+            "description": "Signature of the request",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountWithdrawalPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "content": {
+              "text/plain; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error."
+          },
+          "503": {
+            "description": "System under maintenance."
+          }
+        },
+        "operationId": "request_withdrawal"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountWithdrawalPayload": {
+        "type": "object",
+        "required": [
+          "address",
+          "blockchain",
+          "quantity",
+          "symbol"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Address to withdraw to."
+          },
+          "blockchain": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Blockchain"
+              },
+              {
+                "description": "Blockchain to withdraw on."
+              }
+            ]
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Custom client id."
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity to withdraw."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol of the asset to withdraw."
+          },
+          "twoFactorToken": {
+            "type": "string",
+            "description": "Issued two factor token."
+          }
+        }
+      },
+      "Asset": {
+        "type": "object",
+        "required": [
+          "symbol",
+          "tokens"
+        ],
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Symbol of the asset, e.g. ETH."
+          },
+          "tokens": {
+            "type": "array",
+            "description": "Token on each blockchain the asset is available on.",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          }
+        }
+      },
+      "Balance": {
+        "type": "object",
+        "description": "User balance model.",
+        "required": [
+          "available",
+          "locked",
+          "staked"
+        ],
+        "properties": {
+          "available": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Funds available for use."
+          },
+          "locked": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Funds that are locked because they are in an order that has not been\nexecuted."
+          },
+          "staked": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Funds that are staked."
+          }
+        }
+      },
+      "Blockchain": {
+        "type": "string",
+        "enum": [
+          "Solana",
+          "Ethereum",
+          "Polygon",
+          "Bitcoin"
+        ]
+      },
+      "Deposit": {
+        "type": "object",
+        "required": [
+          "id",
+          "identifier",
+          "source",
+          "status",
+          "symbol",
+          "quantity",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Unique id of the deposit."
+          },
+          "toAddress": {
+            "type": "string",
+            "description": "Deposit address."
+          },
+          "fromAddress": {
+            "type": "string",
+            "description": "Source address."
+          },
+          "confirmationBlockNumber": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Confirmation status, if this is a blockchain deposit."
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Source identifier of the deposit."
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepositSource"
+              },
+              {
+                "description": "Source of the deposit, blockchain or a payment processor."
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepositStatus"
+              },
+              {
+                "description": "Status of the deposit."
+              }
+            ]
+          },
+          "subaccountId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "ID of the user subaccount that the deposit is for."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol of the asset to be deposited."
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity to be deposited."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "naive-date-time",
+            "description": "When the deposit was created."
+          }
+        }
+      },
+      "DepositAddress": {
+        "type": "object",
+        "description": "Exchange deposit address.",
+        "required": [
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Address."
+          }
+        }
+      },
+      "DepositSource": {
+        "type": "string",
+        "enum": [
+          "administrator",
+          "solana",
+          "ethereum",
+          "bitcoin",
+          "nuvei",
+          "banxa",
+          "ioFinnet"
+        ]
+      },
+      "DepositStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "cancelled",
+          "pending",
+          "confirmed",
+          "expired",
+          "initiated",
+          "pending",
+          "pending",
+          "pending",
+          "pending",
+          "received",
+          "refunded",
+          "pending",
+          "pending",
+          "pending"
+        ]
+      },
+      "Depth": {
+        "type": "object",
+        "required": [
+          "asks",
+          "bids",
+          "lastUpdateId"
+        ],
+        "properties": {
+          "asks": {
+            "type": "array",
+            "description": "Asks on the order book.",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxLength": 2,
+              "minLength": 2
+            }
+          },
+          "bids": {
+            "type": "array",
+            "description": "Bids on the order book.",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxLength": 2,
+              "minLength": 2
+            }
+          },
+          "lastUpdateId": {
+            "type": "string",
+            "description": "Update ID that caused the last change to the order book depth."
+          }
+        },
+        "example": {
+          "asks": [
+            [
+              "21.9",
+              "500.123"
+            ],
+            [
+              "22.1",
+              "2321.11"
+            ]
+          ],
+          "bids": [
+            [
+              "20.12",
+              "255.123"
+            ],
+            [
+              "20.5",
+              "499.555"
+            ]
+          ],
+          "lastUpdateId": "1684026955123"
+        }
+      },
+      "Kline": {
+        "type": "object",
+        "required": [
+          "start",
+          "volume",
+          "trades"
+        ],
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "Start time."
+          },
+          "open": {
+            "type": "string",
+            "description": "Open price."
+          },
+          "high": {
+            "type": "string",
+            "description": "High price."
+          },
+          "low": {
+            "type": "string",
+            "description": "Low price."
+          },
+          "close": {
+            "type": "string",
+            "description": "Close price."
+          },
+          "end": {
+            "type": "string",
+            "description": "End time."
+          },
+          "volume": {
+            "type": "string",
+            "description": "Volume in base asset."
+          },
+          "trades": {
+            "type": "string",
+            "description": "Number of trades during the K-line."
+          }
+        }
+      },
+      "KlineInterval": {
+        "type": "string",
+        "enum": [
+          "1m",
+          "3m",
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "2h",
+          "4h",
+          "6h",
+          "8h",
+          "12h",
+          "1d",
+          "3d",
+          "1w",
+          "1month"
+        ]
+      },
+      "LeverageFilter": {
+        "type": "object",
+        "required": [
+          "minLeverage",
+          "maxLeverage",
+          "stepSize"
+        ],
+        "properties": {
+          "minLeverage": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Minimum leverage the order book will allow."
+          },
+          "maxLeverage": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Maximum leverage the order book will allow."
+          },
+          "stepSize": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Leverage increment."
+          }
+        }
+      },
+      "LimitOrder": {
+        "type": "object",
+        "description": "A limit order, which is either filled immediately, or added to the order\nbook (unless time time in force is IOC or FOK).",
+        "required": [
+          "id",
+          "symbol",
+          "side",
+          "quantity",
+          "executedQuantity",
+          "executedQuoteQuantity",
+          "price",
+          "timeInForce",
+          "selfTradePrevention",
+          "postOnly",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique ID of this order. This gets assigned by the matching engine\nso it is initially None."
+          },
+          "clientId": {
+            "type": "integer",
+            "format": "uint32",
+            "description": "Custom order ID."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Market symbol."
+          },
+          "side": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Side"
+              },
+              {
+                "description": "The order side. It will be matched against the resting orders on the\nother side of the order book."
+              }
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity to fill."
+          },
+          "executedQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity that has been filled."
+          },
+          "executedQuoteQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The quantity of the quote asset that has been filled."
+          },
+          "price": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The limit price. The order book will only match this order with\nother orders at this price or better."
+          },
+          "triggerPrice": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Price the order should trigger at, if any."
+          },
+          "timeInForce": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TimeInForce"
+              },
+              {
+                "description": "How long the order is good for."
+              }
+            ]
+          },
+          "selfTradePrevention": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SelfTradePrevention"
+              },
+              {
+                "description": "Action to take in the event the user crosses themselves in the\norder book."
+              }
+            ]
+          },
+          "postOnly": {
+            "type": "boolean",
+            "description": "Whether the order is post only or not"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderStatus"
+              },
+              {
+                "description": "Status of the order."
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Time the order was created."
+          }
+        }
+      },
+      "Market": {
+        "type": "object",
+        "description": "A market is a order book that is live on the engine.\n\nThe fields are the public fields of the order book struct.",
+        "required": [
+          "symbol",
+          "baseSymbol",
+          "quoteSymbol",
+          "filters"
+        ],
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Symbol of the market, e.g. ETHUSDC"
+          },
+          "baseSymbol": {
+            "type": "string",
+            "description": "The base asset of the market, e.g. ETH."
+          },
+          "quoteSymbol": {
+            "type": "string",
+            "description": "The quote asset of the market, e.g. USDC."
+          },
+          "filters": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderBookFilters"
+              },
+              {
+                "description": "Price, lot and leverage rules."
+              }
+            ]
+          }
+        }
+      },
+      "MarketOrder": {
+        "type": "object",
+        "description": "A market order, which is either filled immediately (even partially), or\nreturns unfilled.",
+        "required": [
+          "id",
+          "symbol",
+          "side",
+          "executedQuantity",
+          "executedQuoteQuantity",
+          "timeInForce",
+          "selfTradePrevention",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique ID of this order. This gets assigned by the matching engine\nso it is initially None."
+          },
+          "clientId": {
+            "type": "integer",
+            "format": "uint32",
+            "description": "Custom order ID."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Market symbol."
+          },
+          "side": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Side"
+              },
+              {
+                "description": "The order side. It will be matched against the resting orders on the\nother side of the order book."
+              }
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity to fill."
+          },
+          "executedQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity that has been filled."
+          },
+          "quoteQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity of the quote asset to fill."
+          },
+          "executedQuoteQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity of the quote asset that has been filled."
+          },
+          "triggerPrice": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Price the order should trigger at, if any."
+          },
+          "timeInForce": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TimeInForce"
+              },
+              {
+                "description": "How long the order is good for."
+              }
+            ]
+          },
+          "selfTradePrevention": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SelfTradePrevention"
+              },
+              {
+                "description": "Action to take in the event the user crosses themselves in the\norder book."
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderStatus"
+              },
+              {
+                "description": "Status of the order."
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Time the order was created."
+          }
+        }
+      },
+      "OrderAck": {
+        "type": "object",
+        "description": "Response for order execute when the order is accepted but not yet executed.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Order id."
+          }
+        }
+      },
+      "OrderBookFilters": {
+        "type": "object",
+        "required": [
+          "price",
+          "quantity"
+        ],
+        "properties": {
+          "price": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PriceFilter"
+              },
+              {
+                "description": "Defines the price rules for the order book."
+              }
+            ]
+          },
+          "quantity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QuantityFilter"
+              },
+              {
+                "description": "Defines the quantity rules for the order book."
+              }
+            ]
+          },
+          "leverage": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeverageFilter"
+              },
+              {
+                "description": "Defines the leverage rules for the order book."
+              }
+            ]
+          }
+        }
+      },
+      "OrderCancelAllPayload": {
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Market to cancel orders for."
+          }
+        }
+      },
+      "OrderCancelPayload": {
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "integer",
+            "format": "uint32",
+            "description": "Client ID of the order."
+          },
+          "orderId": {
+            "type": "string",
+            "description": "ID of the order."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Market the order exists on."
+          }
+        }
+      },
+      "OrderExecutePayload": {
+        "type": "object",
+        "required": [
+          "orderType",
+          "side",
+          "symbol"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "integer",
+            "format": "uint32",
+            "description": "Custom order id."
+          },
+          "orderType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderTypeEnum"
+              },
+              {
+                "description": "Order type, market or limit."
+              }
+            ]
+          },
+          "postOnly": {
+            "type": "boolean",
+            "description": "Whether the order is post only or not"
+          },
+          "price": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The order price if this is a limit order"
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The order quantity. Market orders must specify either a `quantity` or\n`quoteQuantity`. All other order types must specify a `quantity`."
+          },
+          "quoteQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The maximum amount of the quote asset to spend (Ask) or receive (Bid)\nfor market orders. This is used for reverse market orders. The\norder book will execute a `quantity` as close as possible to the\nnotional value of `quote_quantity`."
+          },
+          "selfTradePrevention": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SelfTradePrevention"
+              },
+              {
+                "description": "Action to take in the event the user crosses themselves in the\norder book."
+              }
+            ]
+          },
+          "side": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Side"
+              },
+              {
+                "description": "The order side. It will be matched against the resting orders on the\nother side of the order book."
+              }
+            ]
+          },
+          "symbol": {
+            "type": "string",
+            "description": "The market for the order."
+          },
+          "timeInForce": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TimeInForce"
+              },
+              {
+                "description": "How long the order is good for."
+              }
+            ]
+          },
+          "triggerPrice": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Trigger price if this is a conditional order."
+          }
+        }
+      },
+      "OrderFillRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "tradeId",
+          "orderId",
+          "symbol",
+          "side",
+          "price",
+          "quantity",
+          "fee",
+          "feeSymbol",
+          "isMaker",
+          "timestamp"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tradeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "price": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "fee": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "feeSymbol": {
+            "type": "string"
+          },
+          "isMaker": {
+            "type": "boolean"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "naive-date-time"
+          }
+        }
+      },
+      "OrderRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "orderType",
+          "symbol",
+          "side",
+          "timeInForce",
+          "selfTradePrevention",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "orderType": {
+            "$ref": "#/components/schemas/OrderTypeEnum"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "price": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "triggerPrice": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "quoteQuantity": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "timeInForce": {
+            "$ref": "#/components/schemas/TimeInForce"
+          },
+          "selfTradePrevention": {
+            "$ref": "#/components/schemas/SelfTradePrevention"
+          },
+          "postOnly": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          }
+        }
+      },
+      "OrderStatus": {
+        "type": "string",
+        "description": "The status of an order.",
+        "enum": [
+          "Cancelled",
+          "Expired",
+          "Filled",
+          "New",
+          "PartiallyFilled",
+          "Triggered"
+        ]
+      },
+      "OrderType": {
+        "type": "object",
+        "description": "An order to be executed by the order book.",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/OrderType_MarketOrder"
+          },
+          {
+            "$ref": "#/components/schemas/OrderType_LimitOrder"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "orderType",
+          "mapping": {
+            "Market": "#/components/schemas/OrderType_MarketOrder",
+            "Limit": "#/components/schemas/OrderType_LimitOrder"
+          }
+        }
+      },
+      "OrderTypeEnum": {
+        "type": "string",
+        "description": "The type of an order.",
+        "enum": [
+          "Market",
+          "Limit"
+        ]
+      },
+      "OrderType_LimitOrder": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "orderType"
+            ],
+            "properties": {
+              "orderType": {
+                "type": "string",
+                "example": "Limit"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/LimitOrder"
+          }
+        ]
+      },
+      "OrderType_MarketOrder": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "orderType"
+            ],
+            "properties": {
+              "orderType": {
+                "type": "string",
+                "example": "Market"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/MarketOrder"
+          }
+        ]
+      },
+      "PriceFilter": {
+        "type": "object",
+        "required": [
+          "minPrice",
+          "tickSize"
+        ],
+        "properties": {
+          "minPrice": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Minimum price the order book will allow."
+          },
+          "maxPrice": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Maximum price the order book will allow."
+          },
+          "tickSize": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Price increment."
+          }
+        }
+      },
+      "QuantityFilter": {
+        "type": "object",
+        "required": [
+          "minQuantity",
+          "stepSize"
+        ],
+        "properties": {
+          "minQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Minimum quantity the order book will allow."
+          },
+          "maxQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Maximum quantity the order book will allow."
+          },
+          "stepSize": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity increment."
+          }
+        }
+      },
+      "SelfTradePrevention": {
+        "type": "string",
+        "description": "Self trade prevention describes what should happen if the order attempts to\nfill against another order from the same account or trade group.",
+        "enum": [
+          "RejectTaker",
+          "RejectMaker",
+          "RejectBoth",
+          "Allow"
+        ]
+      },
+      "Side": {
+        "type": "string",
+        "description": "Which side of the order book the order is on.",
+        "enum": [
+          "Bid",
+          "Ask"
+        ]
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "Ok",
+          "Maintenance"
+        ]
+      },
+      "StatusAndMessage": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "description": "Status of the system."
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Status message, if any."
+          }
+        }
+      },
+      "Ticker": {
+        "type": "object",
+        "required": [
+          "symbol",
+          "firstPrice",
+          "lastPrice",
+          "priceChange",
+          "priceChangePercent",
+          "high",
+          "low",
+          "volume",
+          "trades"
+        ],
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "The symbol of the market."
+          },
+          "firstPrice": {
+            "type": "string",
+            "format": "decimal",
+            "description": "First price for the interval."
+          },
+          "lastPrice": {
+            "type": "string",
+            "format": "decimal",
+            "description": "First price for the interval."
+          },
+          "priceChange": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Price change for the interval."
+          },
+          "priceChangePercent": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Percentage price change for the interval."
+          },
+          "high": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Highest price for the interval."
+          },
+          "low": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Lowest price for the interval."
+          },
+          "volume": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Volume for the interval."
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Trades for the interval."
+          }
+        }
+      },
+      "TimeInForce": {
+        "type": "string",
+        "description": "The time in force setting for an order.",
+        "enum": [
+          "GTC",
+          "IOC",
+          "FOK"
+        ]
+      },
+      "Token": {
+        "type": "object",
+        "required": [
+          "blockchain",
+          "depositEnabled",
+          "minimumDeposit",
+          "withdrawEnabled",
+          "minimumWithdrawal",
+          "withdrawalFee"
+        ],
+        "properties": {
+          "blockchain": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Blockchain"
+              },
+              {
+                "description": "Blockchain of the token."
+              }
+            ]
+          },
+          "depositEnabled": {
+            "type": "boolean",
+            "description": "Whether deposits are enabled for the asset on this blockchain."
+          },
+          "minimumDeposit": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Minimum accepted deposit for the asset on this blockchain."
+          },
+          "withdrawEnabled": {
+            "type": "boolean",
+            "description": "Whether withdrawals are enabled for the asset on this blockchain."
+          },
+          "minimumWithdrawal": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Minimum accepted withdrawal for the asset on this blockchain."
+          },
+          "maximumWithdrawal": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Maximum accepted withdrawal for the asset on this blockchain."
+          },
+          "withdrawalFee": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Withdrawal fee denominated in the asset"
+          }
+        }
+      },
+      "Trade": {
+        "type": "object",
+        "required": [
+          "id",
+          "price",
+          "quantity",
+          "quoteQuantity",
+          "timestamp",
+          "isBuyerMaker"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Id of the trade."
+          },
+          "price": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Price of the trade."
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity of the trade in the base asset."
+          },
+          "quoteQuantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity of the trade in the quote asset."
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Timestamp of the trade (server time)."
+          },
+          "isBuyerMaker": {
+            "type": "boolean",
+            "description": "Whether the buyer was the maker order."
+          }
+        }
+      },
+      "Withdrawal": {
+        "type": "object",
+        "required": [
+          "id",
+          "blockchain",
+          "quantity",
+          "fee",
+          "symbol",
+          "status",
+          "toAddress",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Unique id of the withdrawal."
+          },
+          "blockchain": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Blockchain"
+              },
+              {
+                "description": "Blockchain the withdrawal was requested for."
+              }
+            ]
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Custom client id."
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Transaction hash of the withdrawal, if it has been sent."
+          },
+          "quantity": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Quantity of the asset to withdraw."
+          },
+          "fee": {
+            "type": "string",
+            "format": "decimal",
+            "description": "Fee charged."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol of the asset to withdraw."
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WithdrawalStatus"
+              },
+              {
+                "description": "Status of the withdrawal."
+              }
+            ]
+          },
+          "subaccountId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "ID of the subaccount requesting this withdrawal."
+          },
+          "toAddress": {
+            "type": "string",
+            "description": "Address to withdraw to."
+          },
+          "transactionHash": {
+            "type": "string",
+            "description": "Transaction hash of withdrawal."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "naive-date-time",
+            "description": "When the withdrawal was created."
+          }
+        }
+      },
+      "WithdrawalStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "pending",
+          "pending",
+          "confirmed",
+          "pending",
+          "pending",
+          "pending",
+          "verifying",
+          "void"
+        ]
+      }
+    }
+  },
+  "x-tagGroups": [
+    {
+      "name": "Public Endpoints",
+      "tags": [
+        "Markets",
+        "System",
+        "Trades"
+      ]
+    },
+    {
+      "name": "Authenticated Endpoints",
+      "tags": [
+        "Capital",
+        "History",
+        "Order",
+        "Websocket Streams"
+      ]
+    }
+  ]
+}
