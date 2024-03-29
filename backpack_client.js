@@ -10,14 +10,15 @@ const qs_1 = __importDefault(require("qs"));
 const ws_1 = __importDefault(require("ws"));
 const BACKOFF_EXPONENT = 1.5;
 const DEFAULT_TIMEOUT_MS = 5000;
-// const BASE_URL = "https://api.backpack.exchange/";
-const BASE_URL = "https://api.cf.backpack.exchange/";
+const BASE_URL = "https://api.backpack.exchange/";
+// const BASE_URL = "https://api.cf.backpack.exchange/";
 // 执行对应操作的命令
 const instructions = {
     public: new Map([
         ["assets", { url: `${BASE_URL}api/v1/assets`, method: "GET" }],
         ["markets", { url: `${BASE_URL}api/v1/markets`, method: "GET" }],
         ["ticker", { url: `${BASE_URL}api/v1/ticker`, method: "GET" }],
+        ["tickers", { url: `${BASE_URL}api/v1/tickers`, method: "GET" }],
         ["depth", { url: `${BASE_URL}api/v1/depth`, method: "GET" }],
         ["klines", { url: `${BASE_URL}api/v1/klines`, method: "GET" }],
         ["status", { url: `${BASE_URL}api/v1/status`, method: "GET" }],
@@ -296,6 +297,9 @@ class BackpackClient {
      */
     async Markets() {
         return this.api("markets");
+    }
+    async Tickers(params) {
+        return this.api("tickers", params);
     }
     /**
      * https://docs.backpack.exchange/#tag/Markets/operation/get_ticker

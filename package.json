@@ -16,6 +16,7 @@
     "clean": "rimraf lib"
   },
   "dependencies": {
+    "@inquirer/prompts": "^4.3.0",
     "got": "^11.8.2",
     "qs": "^6.11.2",
     "ws": "^8.16.0"
