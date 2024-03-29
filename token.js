@@ -1,5 +1,7 @@
 const tokenList = {
-    message: `选择刷量的币种，会随机刷选择的代币。
+    message: `打赏：0x6afd87df0995b025cd4f4efc982f2944cdb53b83
+    作者：https://twitter.com/zisan_xyz
+    选择刷量的币种，会随机刷选择的代币。
   ！确保backpack有大于5USDC数量。
   ！确保选择的币种backpack有一定余额数量，否则会报错。
   ！如果刷wen，请确保backpack有一定数量的wen，其他代币同理。
