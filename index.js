@@ -68,7 +68,7 @@ const init = async (client, token, random, money) => {
 
             console.log(`成功买入次数:${successbuy},成功卖出次数:${sellbuy}`);
             console.log(getNowFormatDate(), `等待${random[randomIndex]}秒...`);
-            await delay(random[randomIndex]);
+            await delay(random[randomIndex]*1000);
             console.log(getNowFormatDate(), "正在获取账户信息中...");
             let userbalance = await client.Balance();
             let tokenPriceList = await client.Tickers();
