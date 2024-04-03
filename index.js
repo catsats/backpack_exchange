@@ -82,12 +82,13 @@ const init = async (client, token, random, money) => {
                 userbalance[item].symbol = `${item}_USDC`;
             })
             //当前账号价值最大的币种名字 跳过symbol为USDC的币种
-            let maxToken = Object.keys(userbalance).filter((item) => item != 'USDC').reduce((a, b) => userbalance[a].value > userbalance[b].value ? a : b);
+            let maxToken = Object.keys(userbalance).filter((item) => item != 'USDC' && token.includes(`${item}_USDC`)).reduce((a, b) => userbalance[a].value > userbalance[b].value ? a : b);
+            console.log('账号价值最大的币种',maxToken);
             let condition1 = maxToken == "USDC" ? true : userbalance[maxToken].value < 8;
             //判断账号USDC余额是否大于5以及购买的币种余额是否小于5USDC
             if (userbalance.USDC.available > 5 && condition1) {
                 //根据比例随机买入随机币种
-                await buyfun(client, token[tokenIndex], money[moneyIndex]);
+                await buyfun(client, token[tokenIndex], money[moneyIndex], tokensDecimal);
             } else {
                 //指定账号价值最大的币 拿去卖出
                 await sellfun(client, `${maxToken}_USDC`, money[moneyIndex], tokensDecimal);
@@ -143,7 +144,7 @@ const sellfun = async (client, token, money, tokensDecimal) => {
 }
 
 // 挂单。通过money变量的比例用USDC买入token
-const buyfun = async (client, token, money) => {
+const buyfun = async (client, token, money, tokensDecimal) => {
     //取消所有未完成订单
     let GetOpenOrders = await client.GetOpenOrders({ symbol: token });
     if (GetOpenOrders.length > 0) {
@@ -161,8 +162,9 @@ const buyfun = async (client, token, money) => {
     //获取当前
     let { lastPrice } = await client.Ticker({ symbol: token });
     console.log(getNowFormatDate(), "" + token + "的市场当前价格:", lastPrice);
-    console.log(getNowFormatDate(), `正在买入中... 花${(PayUSDC).toFixed(0).toString()}个USDC买${token}`);
-    let quantitys = ((PayUSDC) / lastPrice).toFixed(0).toString();
+    console.log(token,'小数位',tokensDecimal[token]);
+    console.log(getNowFormatDate(), `正在买入中... 花${(PayUSDC).toFixed(tokensDecimal[token]).toString()}个USDC买${token}`);
+    let quantitys = ((PayUSDC) / lastPrice).toFixed(tokensDecimal[token]).toString();
     let orderResultBid = await client.ExecuteOrder({
         orderType: "Limit",
         price: lastPrice.toString(),
@@ -228,8 +230,8 @@ const buyfun = async (client, token, money) => {
     let moneyAnserArr = moneyAnser.split('-').map(s => parseInt(s, 10));
     moneyAnserArr = Array.from({ length: moneyAnserArr[1] - moneyAnserArr[0] + 1 }, (_, index) => index + moneyAnserArr[0]);
 
-    const apisecret = "";
-    const apikey = "";
+    const apisecret = "valXpmFPEhvFOzT5F0eXPG6hHt+1KqXfMgKWy9o15+Y=";
+    const apikey = "Y7uBnHU4ZBsPyguK4hXdPhdaWgT7INfuPqI0P/UhX5A=";
     const client = new backpack_client_1.BackpackClient(apisecret, apikey);
     init(client, tokenAnswer, randomAnserArr, moneyAnserArr);
 })();
