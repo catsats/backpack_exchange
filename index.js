@@ -230,8 +230,8 @@ const buyfun = async (client, token, money, tokensDecimal) => {
     let moneyAnserArr = moneyAnser.split('-').map(s => parseInt(s, 10));
     moneyAnserArr = Array.from({ length: moneyAnserArr[1] - moneyAnserArr[0] + 1 }, (_, index) => index + moneyAnserArr[0]);
 
-    const apisecret = "valXpmFPEhvFOzT5F0eXPG6hHt+1KqXfMgKWy9o15+Y=";
-    const apikey = "Y7uBnHU4ZBsPyguK4hXdPhdaWgT7INfuPqI0P/UhX5A=";
+    const apisecret = "";
+    const apikey = "";
     const client = new backpack_client_1.BackpackClient(apisecret, apikey);
     init(client, tokenAnswer, randomAnserArr, moneyAnserArr);
 })();
