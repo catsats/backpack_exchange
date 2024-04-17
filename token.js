@@ -14,6 +14,11 @@ const tokenList = {
             description: 'SOL_USDC',
         },
         {
+            name: 'PRCL_USDC',
+            value: 'PRCL_USDC',
+            description: 'PRCL_USDC',
+        },
+        {
             name: 'BTC_USDC',
             value: 'BTC_USDC',
             description: 'BTC_USDC',
