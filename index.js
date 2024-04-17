@@ -191,7 +191,7 @@ const buyfun = async (client, token, money, tokensDecimal) => {
         return;
     }
     console.log("已选", tokenAnswer);
-    const randomAnser = await input({
+    const randomAnswer = await input({
         message: '请输入交易随机时间间隔(秒)格式为 数字-数字，默认可不填',
         default: "1-3",
         validate: function (value) {
@@ -206,9 +206,9 @@ const buyfun = async (client, token, money, tokensDecimal) => {
             return '请输入正确格式的字符串（例如 "12-43"）！';
         },
     });
-    console.log(`已选${randomAnser}秒 随机交易`);
+    console.log(`已选${randomAnswer}秒 随机交易`);
 
-    const moneyAnser = await input({
+    const moneyAnswer = await input({
         message: '请输入交易随机代币比例，格式为 数字%-数字%，默认可不填',
         default: "40%-70%",
         validate: function (value) {
@@ -223,15 +223,15 @@ const buyfun = async (client, token, money, tokensDecimal) => {
             return '请输入正确格式的字符串（例如 "12%-43%"）！';
         }
     });
-    console.log(`已选${moneyAnser}比例 随机交易`);
+    console.log(`已选${moneyAnswer}比例 随机交易`);
 
-    let randomAnserArr = randomAnser.split('-').map(Number);
-    randomAnserArr = Array.from({ length: randomAnserArr[1] - randomAnserArr[0] + 1 }, (_, index) => index + randomAnserArr[0]);
-    let moneyAnserArr = moneyAnser.split('-').map(s => parseInt(s, 10));
-    moneyAnserArr = Array.from({ length: moneyAnserArr[1] - moneyAnserArr[0] + 1 }, (_, index) => index + moneyAnserArr[0]);
+    let randomAnswerArr = randomAnswer.split('-').map(Number);
+    randomAnswerArr = Array.from({ length: randomAnswerArr[1] - randomAnswerArr[0] + 1 }, (_, index) => index + randomAnswerArr[0]);
+    let moneyAnswerArr = moneyAnswer.split('-').map(s => parseInt(s, 10));
+    moneyAnswerArr = Array.from({ length: moneyAnswerArr[1] - moneyAnswerArr[0] + 1 }, (_, index) => index + moneyAnswerArr[0]);
 
     const apisecret = "";
     const apikey = "";
     const client = new backpack_client_1.BackpackClient(apisecret, apikey);
-    init(client, tokenAnswer, randomAnserArr, moneyAnserArr);
+    init(client, tokenAnswer, randomAnswerArr, moneyAnswerArr);
 })();
